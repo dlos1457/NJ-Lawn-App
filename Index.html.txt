@@ -1,0 +1,114 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>NJ Lawn Buddy</title>
+    <style>
+        body {
+            font-family: Arial, sans-serif;
+            max-width: 600px;
+            margin: 20px auto;
+            padding: 20px;
+            background-color: #f4f4f4;
+        }
+        h1 {
+            color: #2e7d32;
+            text-align: center;
+        }
+        .task-list {
+            background: white;
+            padding: 15px;
+            border-radius: 5px;
+            box-shadow: 0 2px 5px rgba(0,0,0,0.1);
+        }
+        .task {
+            margin: 10px 0;
+        }
+        .task input {
+            margin-right: 10px;
+        }
+        #weather {
+            margin-top: 20px;
+            font-style: italic;
+            color: #555;
+        }
+        button {
+            background: #2e7d32;
+            color: white;
+            padding: 10px;
+            border: none;
+            border-radius: 5px;
+            cursor: pointer;
+            width: 100%;
+        }
+        button:hover {
+            background: #1b5e20;
+        }
+    </style>
+</head>
+<body>
+    <h1>NJ Lawn Buddy</h1>
+    <div class="task-list">
+        <h2>Daily Lawn Care Tasks (July/August)</h2>
+        <div class="task">
+            <input type="checkbox" id="water"> Check rain gauge, water if needed (1-1.5 inches/week, early AM)
+        </div>
+        <div class="task">
+            <input type="checkbox" id="debris"> Clear debris (leaves, twigs)
+        </div>
+        <div class="task">
+            <input type="checkbox" id="inspect"> Inspect for stress (wilting, pests, weeds)
+        </div>
+        <div class="task">
+            <input type="checkbox" id="evening"> Evening check for issues, set sprinklers
+        </div>
+        <button onclick="saveTasks()">Save Tasks</button>
+    </div>
+    <div id="weather">Weather: Loading...</div>
+    <div id="tips">
+        <h3>Tip of the Day</h3>
+        <p>Keep mower blades at 3-3.5 inches for cool-season grasses to reduce heat stress.</p>
+    </div>
+
+    <script>
+        // Load saved tasks from local storage
+        window.onload = function() {
+            const tasks = JSON.parse(localStorage.getItem('lawnTasks')) || {};
+            document.getElementById('water').checked = tasks.water || false;
+            document.getElementById('debris').checked = tasks.debris || false;
+            document.getElementById('inspect').checked = tasks.inspect || false;
+            document.getElementById('evening').checked = tasks.evening || false;
+            fetchWeather(); // Call weather fetch on load
+        };
+
+        // Save tasks to local storage
+        function saveTasks() {
+            const tasks = {
+                water: document.getElementById('water').checked,
+                debris: document.getElementById('debris').checked,
+                inspect: document.getElementById('inspect').checked,
+                evening: document.getElementById('evening').checked
+            };
+            localStorage.setItem('lawnTasks', JSON.stringify(tasks));
+            alert('Tasks saved!');
+        }
+
+        // Fetch weather for Atlantic Highlands
+        function fetchWeather() {
+            const apiKey = 'e6370cb3814e62ce69266c4ed48281dd'; // Your API key
+            const city = 'Atlantic Highlands,US';
+            const url = `https://api.openweathermap.org/data/2.5/weather?q=${city}&appid=${apiKey}&units=imperial`;
+            fetch(url)
+                .then(response => response.json())
+                .then(data => {
+                    document.getElementById('weather').innerText = 
+                        `Weather: ${data.weather[0].description}, Temp: ${data.main.temp}°F, Rain: ${data.rain?.['1h'] || 0}mm`;
+                })
+                .catch(error => {
+                    document.getElementById('weather').innerText = 'Weather: Unable to load data';
+                });
+        }
+    </script>
+</body>
+</html>
