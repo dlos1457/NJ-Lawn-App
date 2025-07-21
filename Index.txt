@@ -1,0 +1,293 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>NJ Lawn Buddy</title>
+    <style>
+        body {
+            font-family: 'Segoe UI', Arial, sans-serif;
+            max-width: 700px;
+            margin: 20px auto;
+            padding: 20px;
+            background: linear-gradient(135deg, #e8f5e9, #c8e6c9);
+            color: #1b5e20;
+        }
+        h1 {
+            text-align: center;
+            color: #2e7d32;
+            font-size: 2.5em;
+            text-shadow: 1px 1px 2px rgba(0,0,0,0.1);
+        }
+        .task-list, .calendar, .history, .tips {
+            background: white;
+            padding: 20px;
+            border-radius: 10px;
+            margin: 15px 0;
+            box-shadow: 0 4px 10px rgba(0,0,0,0.15);
+            transition: transform 0.3s ease;
+        }
+        .task-list:hover, .calendar:hover, .history:hover, .tips:hover {
+            transform: translateY(-5px);
+        }
+        .task {
+            display: flex;
+            align-items: center;
+            margin: 10px 0;
+            animation: fadeIn 0.5s ease-in;
+        }
+        @keyframes fadeIn {
+            from { opacity: 0; transform: translateY(10px); }
+            to { opacity: 1; transform: translateY(0); }
+        }
+        .task input {
+            margin-right: 10px;
+            transform: scale(1.3);
+        }
+        .task label {
+            font-size: 1.1em;
+        }
+        #weather {
+            margin: 15px 0;
+            font-size: 1.2em;
+            font-style: italic;
+            color: #0288d1;
+        }
+        .water-alert {
+            background: #e3f2fd;
+            padding: 10px;
+            border-radius: 5px;
+            margin: 10px 0;
+        }
+        button {
+            background: #2e7d32;
+            color: white;
+            padding: 12px;
+            border: none;
+            border-radius: 8px;
+            cursor: pointer;
+            width: 100%;
+            font-size: 1.1em;
+            transition: background 0.3s ease;
+        }
+        button:hover {
+            background: #1b5e20;
+        }
+        .calendar {
+            display: grid;
+            grid-template-columns: repeat(7, 1fr);
+            gap: 5px;
+            text-align: center;
+        }
+        .calendar div {
+            padding: 10px;
+            border-radius: 5px;
+            background: #f1f8e9;
+        }
+        .calendar .task-day {
+            background: #81c784;
+            color: white;
+            cursor: pointer;
+        }
+        .history {
+            max-height: 150px;
+            overflow-y: auto;
+        }
+        .progress-bar {
+            width: 100%;
+            background: #e0e0e0;
+            height: 20px;
+            border-radius: 10px;
+            margin: 10px 0;
+            overflow: hidden;
+        }
+        .progress {
+            height: 100%;
+            background: #4caf50;
+            width: 0;
+            transition: width 0.5s ease;
+        }
+        .tips a {
+            color: #2e7d32;
+            text-decoration: none;
+        }
+        .tips a:hover {
+            text-decoration: underline;
+        }
+    </style>
+    <script src="https://cdn.jsdelivr.net/npm/chart.js"></script>
+</head>
+<body>
+    <h1>NJ Lawn Buddy 🌱</h1>
+    <div class="task-list">
+        <h2>Daily Lawn Care Tasks (July/August)</h2>
+        <div class="progress-bar"><div class="progress" id="progress"></div></div>
+        <div class="task">
+            <input type="checkbox" id="water"> <label for="water">Check rain gauge, water if needed (1-1.5 inches/week, early AM)</label>
+        </div>
+        <div class="task">
+            <input type="checkbox" id="debris"> <label for="debris">Clear debris (leaves, twigs)</label>
+        </div>
+        <div class="task">
+            <input type="checkbox" id="inspect"> <label for="inspect">Inspect for stress (wilting, pests, weeds)</label>
+        </div>
+        <div class="task">
+            <input type="checkbox" id="evening"> <label for="evening">Evening check for issues, set sprinklers</label>
+        </div>
+        <button onclick="saveTasks()">Save Tasks</button>
+    </div>
+    <div id="weather">Weather: Loading...</div>
+    <div id="water-alert" class="water-alert"></div>
+    <div class="calendar">
+        <h2>Weekly Task Schedule</h2>
+        <div>Sun</div><div>Mon</div><div>Tue</div><div>Wed</div><div>Thu</div><div>Fri</div><div>Sat</div>
+        <div id="calendar-days"></div>
+    </div>
+    <div class="history">
+        <h2>Task History</h2>
+        <div id="history-log"></div>
+    </div>
+    <div class="tips">
+        <h2>Tip of the Day</h2>
+        <p id="daily-tip"></p>
+        <p><a href="https://njaes.rutgers.edu/soil-testing-lab/" target="_blank">Get soil testing from Rutgers</a> | <a href="https://njaes.rutgers.edu/plant-pest-advisory/" target="_blank">Pest alerts</a></p>
+    </div>
+    <div>
+        <h2>Weekly Rainfall (inches)</h2>
+        <canvas id="rainfallChart"></canvas>
+    </div>
+
+    <script>
+        // Daily tasks
+        const tasks = ['water', 'debris', 'inspect', 'evening'];
+        
+        // Load saved tasks and progress
+        window.onload = function() {
+            const savedTasks = JSON.parse(localStorage.getItem('lawnTasks')) || {};
+            tasks.forEach(task => {
+                document.getElementById(task).checked = savedTasks[task] || false;
+            });
+            updateProgress();
+            fetchWeather();
+            renderCalendar();
+            loadHistory();
+            rotateTip();
+        };
+
+        // Save tasks and log history
+        function saveTasks() {
+            const taskStatus = {};
+            tasks.forEach(task => {
+                taskStatus[task] = document.getElementById(task).checked;
+            });
+            localStorage.setItem('lawnTasks', JSON.stringify(taskStatus));
+            logHistory(taskStatus);
+            updateProgress();
+            alert('Tasks saved!');
+        }
+
+        // Update progress bar
+        function updateProgress() {
+            const checked = tasks.filter(task => document.getElementById(task).checked).length;
+            const progress = (checked / tasks.length) * 100;
+            document.getElementById('progress').style.width = `${progress}%`;
+        }
+
+        // Fetch weather and provide watering alert
+        function fetchWeather() {
+            const apiKey = 'e6370cb3814e62ce69266c4ed48281dd';
+            const city = 'Atlantic Highlands,US';
+            const url = `https://api.openweathermap.org/data/2.5/weather?q=${city}&appid=${apiKey}&units=imperial`;
+            fetch(url)
+                .then(response => response.json())
+                .then(data => {
+                    const rain = data.rain?.['1h'] || 0;
+                    document.getElementById('weather').innerText = 
+                        `Weather: ${data.weather[0].description}, Temp: ${data.main.temp}°F, Rain: ${rain}mm`;
+                    document.getElementById('water-alert').innerText = 
+                        rain > 0.5 ? `Skip watering today; ${rain}mm of rain recorded.` : 
+                        `Water if needed to reach 1-1.5 inches/week.`;
+                    updateRainfallChart(rain);
+                })
+                .catch(error => {
+                    document.getElementById('weather').innerText = 'Weather: Unable to load data';
+                });
+        }
+
+        // Rainfall chart
+        let rainfallData = JSON.parse(localStorage.getItem('rainfallData')) || [0, 0, 0, 0, 0, 0, 0];
+        const ctx = document.getElementById('rainfallChart').getContext('2d');
+        const rainfallChart = new Chart(ctx, {
+            type: 'bar',
+            data: {
+                labels: ['Sun', 'Mon', 'Tue', 'Wed', 'Thu', 'Fri', 'Sat'],
+                datasets: [{
+                    label: 'Rainfall (mm)',
+                    data: rainfallData,
+                    backgroundColor: '#4fc3f7',
+                    borderColor: '#0288d1',
+                    borderWidth: 1
+                }]
+            },
+            options: {
+                scales: {
+                    y: { beginAtZero: true, title: { display: true, text: 'Rainfall (mm)' } }
+                }
+            }
+        });
+
+        function updateRainfallChart(rain) {
+            const today = new Date().getDay();
+            rainfallData[today] = rain;
+            localStorage.setItem('rainfallData', JSON.stringify(rainfallData));
+            rainfallChart.data.datasets[0].data = rainfallData;
+            rainfallChart.update();
+        }
+
+        // Weekly task calendar
+        const weeklyTasks = {
+            1: 'Mow lawn (3-3.5 inches)', // Monday
+            4: 'Check for grubs/pests'   // Thursday
+        };
+        function renderCalendar() {
+            const today = new Date().getDay();
+            let calendarHtml = '';
+            for (let i = 0; i < 7; i++) {
+                const task = weeklyTasks[i] || '';
+                calendarHtml += `<div class="${task ? 'task-day' : ''}" onclick="alert('${task || 'No task today'}')">${task || i + 1}</div>`;
+            }
+            document.getElementById('calendar-days').innerHTML = calendarHtml;
+        }
+
+        // Task history log
+        function logHistory(taskStatus) {
+            const history = JSON.parse(localStorage.getItem('taskHistory')) || [];
+            const date = new Date().toLocaleString();
+            const completed = tasks.filter(task => taskStatus[task]).join(', ');
+            if (completed) {
+                history.unshift(`[${date}] Completed: ${completed}`);
+                if (history.length > 10) history.pop();
+                localStorage.setItem('taskHistory', JSON.stringify(history));
+                loadHistory();
+            }
+        }
+        function loadHistory() {
+            const history = JSON.parse(localStorage.getItem('taskHistory')) || [];
+            document.getElementById('history-log').innerHTML = history.map(log => `<p>${log}</p>`).join('');
+        }
+
+        // Rotate daily tips
+        const tips = [
+            'Keep mower blades at 3-3.5 inches for cool-season grasses to reduce heat stress.',
+            'Check for grubs if turf feels spongy; contact Rutgers for advice.',
+            'Water deeply in early AM to avoid fungal diseases like brown patch.',
+            'Hand-pull weeds like crabgrass to prevent spread in summer heat.',
+            'Plan core aeration for late August to improve soil health.'
+        ];
+        function rotateTip() {
+            const today = new Date().getDay();
+            document.getElementById('daily-tip').innerText = tips[today % tips.length];
+        }
+    </script>
+</body>
+</html>
